@@ -1,0 +1,3 @@
+config_file: 'GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py'
+grounded_checkpoint: 'Grounded-Segment-Anything/groundingdino_swint_ogc.pth'
+model_id: 'IDEA-Research/grounding-dino-tiny'
