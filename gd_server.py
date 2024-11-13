@@ -52,10 +52,10 @@ class GroundingDino:
         self.processor = AutoProcessor.from_pretrained(model_id)
         self.grounding_model = AutoModelForZeroShotObjectDetection.from_pretrained(model_id).to(device)
     
-    def process_image(self, image_path, text_str, output_root, score_thr=0.05, text_thr=0.3, show_result=False):
+    def process_image(self, image_path, text_str, score_thr=0.05, text_thr=0.3, show_result=False):
         image_name = image_path.split('/')[-1].split('.')[0]
-        output_result = os.path.join(output_root, image_name+'_gd_detection.json')
-        os.makedirs(output_root, exist_ok=True)
+        # output_result = os.path.join(output_root, image_name+'_gd_detection.json')
+        # os.makedirs(output_root, exist_ok=True)
         image = Image.open(image_path)
         if image.mode == 'RGBA':
             image = image.convert('RGB')
@@ -82,6 +82,13 @@ class GroundingDino:
         class_names = results[0]["labels"]
         class_names_len = len(class_names)
         class_ids = np.array(list(range(len(class_names))))
+        outputs = {
+            'image_path': image_path,
+            'xyxy': input_boxes.tolist(),
+            'confidence': confidences,
+            'class_name': class_names,
+        }
+        return outputs
         ## get annotate file
         img = cv2.imread(image_path)
         detections = sv.Detections(
@@ -102,17 +109,17 @@ class GroundingDino:
             for class_name, confidence
             in zip(class_names, confidences)
         ]
-        if show_result:
-            output_image = os.path.join(output_root, image_name+'_gd.png')
-            self.show_bbox(image_path, detections, labels, output_image)
+        # if show_result:
+        #     output_image = os.path.join(output_root, image_name+'_gd.png')
+        #     self.show_bbox(image_path, detections, labels, output_image)
         outputs = {
             'image_path': image_path,
             'xyxy': detections.xyxy.tolist(),
             'confidence': detections.confidence.tolist(),
             'class_name': class_names,
         }
-        with open(output_result, 'w') as f:
-            json.dump(outputs, f)
+        # with open(output_result, 'w') as f:
+        #     json.dump(outputs, f)
         return output_result, outputs
     
     
@@ -124,20 +131,24 @@ def gd_detection():
     start_time = time.time()
     data = request.get_json()
     image_path = data['image_path']
-    task = data['task']
+    # task = data['task']
     output_root = os.path.dirname(image_path)
     output_root = data.get('output_root', output_root)
     text_prompt = data.get('text_prompt', '.')
     score_thr = float(data.get('score_thr', 0.05))
     text_thr = float(data.get('text_thr', 0.3))
-    output_file, outputs = gd_det.process_image(image_path, text_prompt, output_root, score_thr=score_thr, text_thr=text_thr,show_result=True)
-    response = {}
-    response['output_file'] = output_file
-    response['outputs'] = outputs
+    outputs = gd_det.process_image(image_path, text_prompt, score_thr=score_thr, text_thr=text_thr,show_result=False)
+    # outputs, annote_image = gd_det.post_processer.post_task(task, outputs)
+    # with open(output_file, 'w') as f:
+    #     json.dump(outputs, f)
+    # cv2.imwrite(output_file.replace('.json', '.jpg'), annote_image)
+    # response = {}
+    # response['output_file'] = output_file
+    # response['outputs'] = outputs
     end_time = time.time()
     use_time = round(end_time - start_time, 3)
     print(use_time)
-    return jsonify(response)
+    return jsonify(outputs)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10004)
